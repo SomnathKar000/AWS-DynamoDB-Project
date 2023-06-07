@@ -35,8 +35,8 @@ const createUserData = async (req, res) => {
     if (err) {
       console.log(err);
     } else {
-      console.log(data);
-      res.status(400).json({ success: false, msg: "New error" });
+      // console.log(data);
+      return res.status(400).json({ success: false, msg: "New error" });
     }
   });
 
