@@ -1,9 +1,7 @@
 const dynamoClient = require("../config/connectDB");
 const customError = require("../error/custom-error");
-const validator = require("email-validator");
 const TABLE_NAME = "user-data-api";
 const shortid = require("shortid");
-const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const getUserData = async (req, res) => {
@@ -15,50 +13,40 @@ const getUserData = async (req, res) => {
 };
 
 const updateUserData = (req, res) => {
-  res.status(200).json({ success: true, msg: "Update USER DATA" });
+  try {
+    const token = req.headers["auth-token"];
+    const { id } = jwt.verify(token, process.env.JWT_SECRET);
+    const params = {
+      TableName: TABLE_NAME,
+      Item: {
+        id,
+        ...req.body,
+      },
+    };
+    const data = dynamoClient.patch(params).promise();
+    res.status(200).json({ success: true, msg: "Update USER DATA", data });
+  } catch (error) {
+    console.log(error);
+    throw new customError(error.message, 400);
+  }
 };
 
 const createUserData = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!validator.validate(email)) {
-    throw new customError("Enter a valid email", 400);
-  }
+  const id = shortid.generate();
 
   let params = {
     TableName: TABLE_NAME,
-    Key: {
-      email: email,
+    Item: {
+      id,
+      ...req.body,
     },
   };
-  await dynamoClient.get(params, (err, data) => {
-    if (err) {
-      console.log(err);
-    } else {
-      // console.log(data);
-      return res.status(400).json({ success: false, msg: "New error" });
-    }
-  });
 
-  const Id = shortid.generate();
-  const salt = bcryptjs.genSaltSync(10);
-  const securePassword = bcryptjs.hashSync(password, salt);
+  const token = jwt.sign({ id }, process.env.JWT_SECRET);
 
-  let Item = {
-    id: Id,
-    email,
-    password: securePassword,
-  };
-  params = {
-    TableName: TABLE_NAME,
-    Item,
-  };
-
-  const token = jwt.sign({ Id }, process.env.JWT_SECRET);
-
-  dynamoClient.put(params, (error, data) => {
+  await dynamoClient.put(params, (error, data) => {
     if (error) {
-      // console.log(error);
+      console.log(error);
       throw new customError(error.message, 400);
     } else {
       console.log(data);
@@ -69,8 +57,21 @@ const createUserData = async (req, res) => {
   });
 };
 
-const deleteUserData = (req, res) => {
-  res.status(200).json({ success: true, msg: "delete USER DATA" });
+const deleteUserData = async (req, res) => {
+  try {
+    const token = req.headers["auth-token"];
+    const { id } = jwt.verify(token, process.env.JWT_SECRET);
+    const params = {
+      TableName: TABLE_NAME,
+      Key: {
+        id,
+      },
+    };
+    await dynamoClient.delete(params).promise();
+    res.status(200).json({ success: true, msg: "Delete user data", data });
+  } catch (error) {
+    throw new customError(error.message, 400);
+  }
 };
 module.exports = {
   getUserData,
